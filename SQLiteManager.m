@@ -100,7 +100,9 @@
 													andCode:kDBErrorQuery];
 		}
 		sqlite3_finalize(statement);
-		errorQuery = [self closeDatabase];
+        if (!bInTransaction) {
+            errorQuery = [self closeDatabase];
+        }
 	}
 	else {
 		errorQuery = openError;
@@ -166,7 +168,9 @@
 													andCode:kDBErrorQuery];
 		}
 		sqlite3_finalize(statement);
-		errorQuery = [self closeDatabase];
+        if (!bInTransaction) {
+            errorQuery = [self closeDatabase];
+        }
 	}
 	else {
 		errorQuery = openError;
@@ -299,7 +303,9 @@
 	} //end while
 	sqlite3_finalize(statement);
 	
-	[self closeDatabase];
+    if (!bInTransaction) {
+        [self closeDatabase];
+    }
 	
 	return resultsArray;
 	
@@ -315,7 +321,6 @@
 - (NSError *) closeDatabase {
 	
 	NSError *error = nil;
-	
 	
 	if (db != nil) {
 		if (sqlite3_close(db) != SQLITE_OK){
@@ -428,12 +433,72 @@
 			
 			//finish our insert statement
 			[dump appendString:@");\n"];
-			
 		}
-		
 	}
     
 	return dump;
+}
+
+#pragma mark -
+#pragma mark Transactions
+#pragma mark -
+
+- (NSError *)beginTransaction {
+    NSError *error = nil;
+    NSError *openError = nil;
+    
+    if (db == nil) {
+        openError = [self openDatabase];
+    }
+	
+	if (openError == nil) {
+		if (sqlite3_exec(db, "BEGIN", 0, 0, 0) != SQLITE_OK){
+			const char *errorMsg = sqlite3_errmsg(db);
+			NSString *errorStr = [NSString stringWithFormat:@"The transaction could not be started: %@",[NSString stringWithCString:errorMsg encoding:NSUTF8StringEncoding]];
+			error = [self createDBErrorWithDescription:errorStr andCode:kDBFailAtClose];
+		} else {
+            bInTransaction = YES;
+        }
+	} else {
+        error = openError;
+    }
+	
+	return error;
+}
+
+- (NSError *)commitTransaction {
+    NSError *error = nil;
+	
+	if (db != nil) {
+		if (sqlite3_exec(db, "COMMIT", 0, 0, 0) != SQLITE_OK){
+			const char *errorMsg = sqlite3_errmsg(db);
+			NSString *errorStr = [NSString stringWithFormat:@"The transaction could not be committed: %@",[NSString stringWithCString:errorMsg encoding:NSUTF8StringEncoding]];
+			error = [self createDBErrorWithDescription:errorStr andCode:kDBFailAtClose];
+		} else {
+            bInTransaction = NO;
+            error = [self closeDatabase];
+        }
+	}
+	
+	return error;
+
+}
+
+- (NSError *)rollbackTransaction {
+     NSError *error = nil;
+    
+    if (db != nil) {
+		if (sqlite3_exec(db, "ROLLBACK", 0, 0, 0) != SQLITE_OK){
+			const char *errorMsg = sqlite3_errmsg(db);
+			NSString *errorStr = [NSString stringWithFormat:@"The transaction could not be rolled back: %@",[NSString stringWithCString:errorMsg encoding:NSUTF8StringEncoding]];
+			error = [self createDBErrorWithDescription:errorStr andCode:kDBFailAtClose];
+		} else {
+            bInTransaction = NO;
+            error = [self closeDatabase];
+        }
+	}
+	
+	return error;
 }
 
 @end

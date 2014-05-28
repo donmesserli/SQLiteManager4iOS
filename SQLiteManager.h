@@ -22,6 +22,7 @@ enum errorCodes {
 
 	sqlite3 *db; // The SQLite db reference
 	NSString *databaseName; // The database name
+    BOOL bInTransaction;
 }
 
 - (id)initWithDatabaseNamed:(NSString *)name;
@@ -33,6 +34,11 @@ enum errorCodes {
 - (NSArray *) getRowsForQuery:(NSString *)sql;
 - (NSError *) closeDatabase;
 - (NSInteger)getLastInsertRowID;
+
+// Transactions
+- (NSError *)beginTransaction;
+- (NSError *)commitTransaction;
+- (NSError *)rollbackTransaction;
 
 - (NSString *)getDatabaseDump;
 
